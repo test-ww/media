@@ -1,0 +1,16 @@
+/* 1. 字体导入规则 (必须在文件最顶部) */
+@import '@fontsource/roboto/300.css'; /* Light 300 */
+@import '@fontsource/roboto/400.css'; /* Regular 400 */
+@import '@fontsource/roboto/500.css'; /* Medium 500 */
+@import '@fontsource/roboto/700.css'; /* Bold 700 */
+@import '@fontsource/roboto/900.css'; /* Black 900 */
+
+/* 2. 全局布局重置与修复 (紧随导入之后) */
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}

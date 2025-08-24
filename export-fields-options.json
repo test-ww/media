@@ -1,0 +1,130 @@
+{
+  "contextAuthorTeam": {
+    "label": "您在哪个团队？",
+    "name": "所属团队",
+    "type": "multiple-select",
+    "isUpdatable": true,
+    "isMandatory": true,
+    "isExportVisible": true,
+    "isExploreVisible": true,
+    "options": [
+      {
+        "value": "marketing",
+        "label": "内容营销"
+      },
+      {
+        "value": "communityManagement",
+        "label": "社区管理"
+      },
+      {
+        "value": "hr",
+        "label": "人力资源"
+      },
+      {
+        "value": "product",
+        "label": "产品开发"
+      },
+      {
+        "value": "sales",
+        "label": "销售支持"
+      }
+    ]
+  },
+  "contextTargetPlatform": {
+    "label": "它的目标平台是什么？",
+    "name": "目标平台",
+    "type": "multiple-select",
+    "isUpdatable": true,
+    "isMandatory": true,
+    "isExportVisible": true,
+    "isExploreVisible": true,
+    "options": [
+      {
+        "value": "mailing",
+        "label": "邮件营销"
+      },
+      {
+        "value": "website",
+        "label": "公共网站"
+      },
+      {
+        "value": "socialMedias",
+        "label": "社交媒体"
+      },
+      {
+        "value": "product",
+        "label": "产品开发"
+      }
+    ]
+  },
+  "contextAssociatedBrand": {
+    "label": "您为哪个品牌创建了此图片？",
+    "name": "相关品牌",
+    "type": "multiple-select",
+    "isUpdatable": true,
+    "isMandatory": false,
+    "isExportVisible": true,
+    "isExploreVisible": true,
+    "options": [
+      {
+        "value": "gemo",
+        "label": "Gémo"
+      },
+      {
+        "value": "mellowYellow",
+        "label": "Mellow Yellow"
+      },
+      {
+        "value": "bocage",
+        "label": "Bocage"
+      },
+      {
+        "value": "maje",
+        "label": "Maje"
+      },
+      {
+        "value": "bash",
+        "label": "Ba&sh"
+      },
+      {
+        "value": "sessun",
+        "label": "Sessùn"
+      },
+      {
+        "value": "americanVintage",
+        "label": "American Vintage"
+      },
+      {
+        "value": "theKooples",
+        "label": "The Kooples"
+      }
+    ]
+  },
+  "contextCollection": {
+    "label": "它与哪个系列相关？",
+    "name": "相关系列",
+    "type": "multiple-select",
+    "isUpdatable": true,
+    "isMandatory": false,
+    "isExportVisible": true,
+    "isExploreVisible": true,
+    "options": [
+      {
+        "value": "spring",
+        "label": "春季"
+      },
+      {
+        "value": "summer",
+        "label": "夏季"
+      },
+      {
+        "value": "fall",
+        "label": "秋季"
+      },
+      {
+        "value": "winter",
+        "label": "冬季"
+      }
+    ]
+  }
+}
