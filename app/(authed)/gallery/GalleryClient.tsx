@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react'; // 1. 导入 useEffect
 import { useRouter } from 'next/navigation';
 import type { SignedVideoAsset } from '@/app/api/gallery/action';
 import './gallery.css';
@@ -9,7 +8,7 @@ import './gallery.css';
 export default function GalleryClient({ videos }: { videos: SignedVideoAsset[] }) {
   const [selectedVideo, setSelectedVideo] = useState<SignedVideoAsset | null>(null);
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
-  const modalVideoRef = useRef<HTMLVideoElement>(null);
+  const modalVideoRef = useRef<HTMLVideoElement>(null); // 2. 为模态框中的视频创建一个 ref
   const router = useRouter();
 
   const handleMouseEnter = (id: string) => {
@@ -35,7 +34,7 @@ export default function GalleryClient({ videos }: { videos: SignedVideoAsset[] }
     if (selectedVideo && modalVideoRef.current) {
       modalVideoRef.current.play().catch(console.error);
     }
-  }, [selectedVideo]);
+  }, [selectedVideo]); // 当 selectedVideo 变化时触发
 
   return (
     <>

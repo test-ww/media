@@ -60,7 +60,7 @@ steps:
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
-      - '--set-secrets=FIREBASE_PRIVATE_KEY=firebase-private-key:latest'
+      - '--set-secrets=GOOGLE_APPLICATION_CREDENTIALS_JSON=gcs-signer-key:latest,FIREBASE_PRIVATE_KEY=firebase-private-key:latest'
       - '--update-env-vars'
       - >-
         FIREBASE_PROJECT_ID=$PROJECT_ID,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation"; // 1. 导入 useSearchParams
 import { Drawer, List, ListItem, Typography, ListItemButton, Box, Collapse } from "@mui/material";
 import Image from "next/image";
 import { getNavConfig, NavItem, NavLink } from "../../nav-config";
@@ -14,7 +14,7 @@ import ExpandMore from '@mui/icons-material/ExpandMore';
 
 const drawerWidth = 265;
 
-// 一个独立的、可复用的导航链接组件
+// 这是一个独立的、可复用的导航链接组件，保留您所有的样式
 const NavLinkItem = ({ link, isSelected, isChild = false }: { link: NavLink, isSelected: boolean, isChild?: boolean }) => {
   const router = useRouter();
   return (
@@ -41,12 +41,17 @@ const NavLinkItem = ({ link, isSelected, isChild = false }: { link: NavLink, isS
 };
 
 export default function SideNav() {
+  const router = useRouter(); // 保留 router
   const pathname = usePathname();
+  const searchParams = useSearchParams(); // 2. 获取 searchParams 实例
   const { appContext } = useAppContext();
   const navConfig = getNavConfig();
 
-  const [isStudioOpen, setStudioOpen] = useState(true);
+  // 3. 【核心修复】: 重建完整的当前路径，用于精确匹配
+  const currentQueryString = searchParams.toString();
+  const currentPath = currentQueryString ? `${pathname}?${currentQueryString}` : pathname;
 
+  const [isStudioOpen, setStudioOpen] = useState(true);
   const handleStudioClick = () => {
     setStudioOpen(!isStudioOpen);
   };
@@ -78,6 +83,7 @@ export default function SideNav() {
         </ListItem>
 
         {navConfig.map((item: NavItem) => {
+          // 如果是可折叠的组
           if (item.type === 'group') {
             return (
               <div key={item.id}>
@@ -94,7 +100,8 @@ export default function SideNav() {
                         <NavLinkItem
                           key={child.id}
                           link={child}
-                          isSelected={pathname === child.href.split('?')[0]}
+                          // 4. 【核心修复】: 使用完整的 currentPath 进行精确比较
+                          isSelected={currentPath === child.href}
                           isChild={true}
                         />
                       ) : null
@@ -105,14 +112,14 @@ export default function SideNav() {
             );
           }
 
+          // 如果是直接链接
           if (item.type === 'link') {
             return item.status === 'true' ? (
               <NavLinkItem
                 key={item.id}
                 link={item}
-                // *** THE FIX IS HERE ***
-                // 对所有链接都使用统一的、更严谨的判断逻辑
-                isSelected={pathname === item.href.split('?')[0]}
+                // 4. 【核心修复】: 使用完整的 currentPath 进行精确比较
+                isSelected={currentPath === item.href}
               />
             ) : null;
           }
@@ -121,12 +128,16 @@ export default function SideNav() {
         })}
       </List>
 
+      {/* 保留您原始的底部结构 */}
       <Box sx={{ p: 2 }}>
         <AuthTrigger />
       </Box>
 
       <Box sx={{ pb: 2, px: 3, width: "100%" }}>
-        <Typography variant="caption" sx={{ color: "#5865F2", textAlign: "center", display: "block" }}>
+        <Typography
+          variant="caption"
+          sx={{ color: "#5865F2", textAlign: "center", display: "block" }}
+        >
           / 欢迎合作 <span style={{ margin: 1 }}>❤</span>{" "}
           <a href="https://cloudpuppy.ai/" target="_blank" rel="noopener noreferrer" style={{ color: "inherit", fontWeight: 700, textDecoration: "none" }}>
             @CloudPuppy
