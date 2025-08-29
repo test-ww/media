@@ -1,18 +1,12 @@
 "use server";
 
-// 导入我们新创建的工具函数
-import { verifyTokenAndManageQuota } from "../auth-and-quota";
-
-// 【核心修复】: 导入所有需要的类型
+import { verifyTokenAndCheckQuota, deductQuota } from "../auth-and-quota";
 import type { AuthClient } from "google-auth-library/build/src/auth/authclient";
 import type { GaxiosResponse, GaxiosOptions } from "gaxios";
-
 import { appContextDataI } from "../../context/app-context";
 import { downloadMediaFromGcs } from "../cloud-storage/action";
 import { VirtualTryOnFormI } from "../virtual-try-on-utils";
 import { ImageI } from "../generate-image-utils";
-
-// 【核心修复】: 已移除顶层的 'import { GoogleAuth } from "google-auth-library";'
 
 function generateUniqueFolderId() {
   let number = Math.floor(Math.random() * 9) + 1;
@@ -33,43 +27,43 @@ interface PredictionResponse {
 
 export const generateVtoImage = async (
   formData: VirtualTryOnFormI,
-  appContext: appContextDataI
+  appContext: appContextDataI,
+  idToken: string
 ): Promise<ImageI | { error: string }> => {
+  let uid: string;
   try {
-    await verifyTokenAndManageQuota("imagen");
+    const result = await verifyTokenAndCheckQuota("imagen", idToken);
+    uid = result.uid;
   } catch (error: any) {
-    console.error("Authentication or quota check failed for Virtual Try-On:", error.message);
-    return {
-      error: error.message,
-    };
+    console.error("虚拟试穿的认证或配额检查失败:", error.message);
+    return { error: error.message };
   }
 
   if (!appContext?.gcsURI) {
-    return { error: "User GCS URI is not configured in the application context." };
+    return { error: "应用上下文中未配置用户 GCS URI。" };
   }
 
   if (!appContext?.userID) {
-    return { error: "User ID is not configured in the application context." };
+    return { error: "应用上下文中未配置用户 ID。" };
   }
 
   let client: AuthClient;
   try {
-    // 【核心修复】: 在函数内部动态导入
     const { GoogleAuth } = await import("google-auth-library");
     const auth = new GoogleAuth({
       scopes: "https://www.googleapis.com/auth/cloud-platform",
     });
     client = await auth.getClient();
   } catch (error) {
-    console.error("Authentication Error:", error);
-    return { error: "Unable to authenticate your account." };
+    console.error("认证错误:", error);
+    return { error: "无法验证您的账户。" };
   }
 
   const location = process.env.NEXT_PUBLIC_VERTEX_API_LOCATION || "us-central1";
   const projectId = process.env.NEXT_PUBLIC_PROJECT_ID;
 
   if (!projectId) {
-    return { error: "Project ID is not configured in environment variables." };
+    return { error: "环境变量中未配置项目 ID。" };
   }
 
   const modelVersion = formData.modelVersion;
@@ -106,19 +100,19 @@ export const generateVtoImage = async (
     const res: GaxiosResponse<PredictionResponse> = await client.request(opts);
 
     if (typeof res.data !== "object" || res.data === null || !("predictions" in res.data)) {
-      throw new Error("Unexpected API response structure.");
+      throw new Error("API 响应结构异常。");
     }
 
     const responseData = res.data;
 
     if (!responseData.predictions || responseData.predictions.length === 0) {
-      throw new Error("API returned no predictions.");
+      throw new Error("API 未返回任何预测结果。");
     }
 
     const predictionResult = responseData.predictions[0];
 
     if (predictionResult.error) {
-      throw new Error(`API returned an error: ${predictionResult.error.message || "Unknown error"}`);
+      throw new Error(`API 返回错误: ${predictionResult.error.message || "未知错误"}`);
     }
 
     let generatedImageBase64: string;
@@ -126,21 +120,21 @@ export const generateVtoImage = async (
     const finalGcsUri = predictionResult.gcsUri;
 
     if (!finalGcsUri) {
-      throw new Error("API did not return a GCS URI for the generated image.");
+      throw new Error("API 未返回生成图片的 GCS URI。");
     }
 
     if (predictionResult.bytesBase64Encoded) {
       generatedImageBase64 = predictionResult.bytesBase64Encoded;
     } else {
-      console.log(`Bytes not found in API response, attempting to download from final GCS path: ${finalGcsUri}`);
-      const downloadResult = await downloadMediaFromGcs(finalGcsUri);
+      console.log(`在 API 响应中未找到图片数据，尝试从 GCS 路径下载: ${finalGcsUri}`);
+      const downloadResult = await downloadMediaFromGcs(finalGcsUri, idToken);
 
       if (downloadResult.error) {
-        throw new Error(`Failed to download generated image from GCS: ${downloadResult.error}`);
+        throw new Error(`从 GCS 下载生成图片失败: ${downloadResult.error}`);
       }
 
       if (!downloadResult.data) {
-        throw new Error(`Image data is missing after successful download from GCS.`);
+        throw new Error(`从 GCS 成功下载后，图片数据缺失。`);
       }
 
       generatedImageBase64 = downloadResult.data;
@@ -154,20 +148,21 @@ export const generateVtoImage = async (
       ratio: "",
       width: 0,
       height: 0,
-      altText: "Generated try-on image",
+      altText: "生成的试穿图片",
       key: uniqueId,
       format: cleanFormat,
-      prompt: `Try-on with model version: ${formData.modelVersion}`,
+      prompt: `虚拟试穿模型版本: ${formData.modelVersion}`,
       date: new Date().toISOString(),
-      author: appContext.userID || "Unknown User",
+      author: appContext.userID || "未知用户",
       modelVersion: formData.modelVersion,
       mode: "try-on",
     };
 
+    await deductQuota(uid, "imagen");
     return resultImage;
   } catch (error: any) {
-    console.error("Error calling Virtual Try-On API:", error);
-    const errorMessage = error.response?.data?.error?.message || error.message || "An unknown error occurred.";
+    console.error("调用虚拟试穿 API 时出错:", error);
+    const errorMessage = error.response?.data?.error?.message || error.message || "发生未知错误。";
     return { error: errorMessage };
   }
 };

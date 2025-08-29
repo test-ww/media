@@ -1,30 +1,24 @@
 "use server";
 
-// 导入我们新的认证工具函数
 import { verifyTokenOnly } from "../auth-and-quota";
-
-const ffmpegInstaller = require("@ffmpeg-installer/ffmpeg");
-const ffprobeInstaller = require("@ffprobe-installer/ffprobe");
 import ffmpeg from "fluent-ffmpeg";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
-
-// 【核心修复】: 导入所有需要的类型
 import type { Storage, GetSignedUrlConfig } from "@google-cloud/storage";
 
-ffmpeg.setFfmpegPath(ffmpegInstaller.path);
-ffmpeg.setFfprobePath(ffprobeInstaller.path);
+if (process.env.FFMPEG_PATH) {
+    ffmpeg.setFfmpegPath(process.env.FFMPEG_PATH);
+}
+if (process.env.FFPROBE_PATH) {
+    ffmpeg.setFfprobePath(process.env.FFPROBE_PATH);
+}
 
-// 【核心修复】: 已移除顶层的 'const { Storage } = require("@google-cloud/storage");'
-
-// 【核心修复】: 创建一个辅助函数来按需初始化 Storage 客户端
 async function getStorageClient(): Promise<Storage> {
     const { Storage } = await import("@google-cloud/storage");
     const projectId = process.env.NEXT_PUBLIC_PROJECT_ID;
     return new Storage({ projectId });
 }
-
 
 export async function decomposeUri(uri: string) {
     const sourceUriParts = uri.replace("gs://", "").split("/");
@@ -37,6 +31,7 @@ export async function decomposeUri(uri: string) {
     };
 }
 
+// 这个函数是公共的，不需要认证，保持不变
 export async function getSignedURL(gcsURI: string): Promise<string | { error: string }> {
     try {
         const { bucketName, fileName } = await decomposeUri(gcsURI);
@@ -58,9 +53,13 @@ export async function getSignedURL(gcsURI: string): Promise<string | { error: st
     }
 }
 
-export async function copyImageToTeamBucket(sourceGcsUri: string, id: string): Promise<string> {
+/**
+ * 【核心修改】: 增加 idToken 参数
+ */
+export async function copyImageToTeamBucket(sourceGcsUri: string, id: string, idToken: string): Promise<string> {
     try {
-        await verifyTokenOnly();
+        // 【核心修改】: 将 idToken 传递给认证函数
+        await verifyTokenOnly(idToken);
     } catch (error: any) {
         throw new Error(error.message);
     }
@@ -92,7 +91,17 @@ export async function copyImageToTeamBucket(sourceGcsUri: string, id: string): P
     }
 }
 
-export async function downloadMediaFromGcs(gcsUri: string): Promise<{ data?: string; error?: string }> {
+/**
+ * 【核心修改】: 增加 idToken 参数
+ */
+export async function downloadMediaFromGcs(gcsUri: string, idToken: string): Promise<{ data?: string; error?: string }> {
+    try {
+        // 【核心修改】: 将 idToken 传递给认证函数
+        await verifyTokenOnly(idToken);
+    } catch (error: any) {
+        return { error: error.message };
+    }
+
     if (!gcsUri || !gcsUri.startsWith("gs://")) {
         return { error: "Invalid GCS URI format. It must start with gs://" };
     }
@@ -111,6 +120,7 @@ export async function downloadMediaFromGcs(gcsUri: string): Promise<{ data?: str
     }
 }
 
+// 这个函数是内部辅助函数，由其他已认证的函数调用，可以不直接加认证
 export async function downloadTempVideo(gcsUri: string): Promise<string> {
     const storage = await getStorageClient();
     const { bucketName, fileName } = await decomposeUri(gcsUri);
@@ -125,6 +135,7 @@ export async function downloadTempVideo(gcsUri: string): Promise<string> {
     return tempFilePath;
 }
 
+// 这个函数是内部辅助函数，由其他已认证的函数调用，可以不直接加认证
 export async function fetchJsonFromStorage(gcsUri: string): Promise<any> {
     try {
         const storage = await getStorageClient();
@@ -146,14 +157,19 @@ export async function fetchJsonFromStorage(gcsUri: string): Promise<any> {
     }
 }
 
+/**
+ * 【核心修改】: 增加 idToken 参数
+ */
 export async function uploadBase64Image(
     base64Image: string,
     bucketName: string,
     objectName: string,
-    contentType: string = "image/png"
+    contentType: string = "image/png",
+    idToken: string
 ): Promise<{ success?: boolean; message?: string; error?: string; fileUrl?: string }> {
     try {
-        await verifyTokenOnly();
+        // 【核心修改】: 将 idToken 传递给认证函数
+        await verifyTokenOnly(idToken);
     } catch (error: any) {
         return { error: error.message };
     }
@@ -184,10 +200,21 @@ export async function uploadBase64Image(
     }
 }
 
+/**
+ * 【核心修改】: 增加 idToken 参数
+ */
 export async function getVideoThumbnailBase64(
     videoSourceGcsUri: string,
-    ratio: string
+    ratio: string,
+    idToken: string
 ): Promise<{ thumbnailBase64Data?: string; mimeType?: string; error?: string }> {
+    try {
+        // 【核心修改】: 将 idToken 传递给认证函数
+        await verifyTokenOnly(idToken);
+    } catch (error: any) {
+        return { error: error.message };
+    }
+
     const outputMimeType = "image/png";
     const tempThumbnailFileName = `thumbnail_${Date.now()}.png`;
     const tempThumbnailPath = path.join(os.tmpdir(), tempThumbnailFileName);
@@ -231,9 +258,13 @@ export async function getVideoThumbnailBase64(
     }
 }
 
-export async function deleteMedia(gcsURI: string): Promise<boolean | { error: string }> {
+/**
+ * 【核心修改】: 增加 idToken 参数
+ */
+export async function deleteMedia(gcsURI: string, idToken: string): Promise<boolean | { error: string }> {
     try {
-        await verifyTokenOnly();
+        // 【核心修改】: 将 idToken 传递给认证函数
+        await verifyTokenOnly(idToken);
     } catch (error: any) {
         return { error: error.message };
     }

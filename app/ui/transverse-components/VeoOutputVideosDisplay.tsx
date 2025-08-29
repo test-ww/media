@@ -1,21 +1,18 @@
-// 文件路径: app/ui/transverse-components/VeoOutputVideosDisplay.tsx
-
 'use client';
 
 import * as React from 'react';
 import { useRef, useState } from 'react';
 import Image from 'next/image';
-// ==================== 新增导入 ====================
 import {
   CreateNewFolderRounded, Download, PlayArrowRounded, ChevronLeft,
   ChevronRight, ContentCopy, InfoOutlined as InfoOutlinedIcon
 } from '@mui/icons-material';
-// =================================================
-
 import {
   Box, IconButton, Modal, Skeleton, ImageListItem, ImageList,
   ImageListItemBar, Stack, CircularProgress, Typography, Paper, Tooltip, Snackbar, Alert, Grid
 } from '@mui/material';
+import { getAuth } from 'firebase/auth'; // <-- 【核心修改】导入 getAuth
+
 import { VideoI } from '../../api/generate-video-utils';
 import ExportStepper, { downloadBase64Media } from './ExportDialog';
 import { downloadMediaFromGcs } from '@/app/api/cloud-storage/action';
@@ -44,13 +41,10 @@ const PromptDisplay = ({ prompt, onCopy }: { prompt: string, onCopy: () => void 
   );
 };
 
-// ==================== 修改 EmptyState 组件 ====================
 const EmptyState = () => {
   const [videoFullScreen, setVideoFullScreen] = useState<ExampleVideo | null>(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-  // 新增状态：用于追踪哪个提示词是激活状态
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   const exampleVideos: ExampleVideo[] = [
@@ -67,9 +61,8 @@ const EmptyState = () => {
     }
   };
 
-  // 新增点击处理函数：用于切换提示词的显示/隐藏
   const handleTogglePrompt = (e: React.MouseEvent, index: number) => {
-    e.stopPropagation(); // 关键：阻止事件冒泡
+    e.stopPropagation();
     setActiveIndex(prevIndex => (prevIndex === index ? null : index));
   };
 
@@ -86,18 +79,17 @@ const EmptyState = () => {
               {exampleVideos.map((ex, index) => (
                 <Grid item key={index} sx={{ minWidth: 200, display: 'flex' }}>
                   <Stack direction="column" spacing={1}>
-                    <Paper 
-                      elevation={3} 
-                      onClick={() => setVideoFullScreen(ex)} 
-                      sx={{ 
-                        width: 200, height: 200, overflow: 'hidden', position: 'relative', 
-                        cursor: 'pointer', borderRadius: 3, transition: 'transform 0.2s ease-in-out', 
-                        flexShrink: 0, '&:hover': { transform: 'scale(1.05)' } 
+                    <Paper
+                      elevation={3}
+                      onClick={() => setVideoFullScreen(ex)}
+                      sx={{
+                        width: 200, height: 200, overflow: 'hidden', position: 'relative',
+                        cursor: 'pointer', borderRadius: 3, transition: 'transform 0.2s ease-in-out',
+                        flexShrink: 0, '&:hover': { transform: 'scale(1.05)' }
                       }}
                     >
                       <Image src={ex.thumbnail} alt={`Example ${index + 1}`} layout="fill" objectFit="cover" />
                       <PlayArrowRounded sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontSize: '4rem', color: 'rgba(255, 255, 255, 0.9)', pointerEvents: 'none' }} />
-                      {/* 新增的信息图标按钮 */}
                       <Tooltip title="显示/隐藏提示词">
                         <IconButton
                           onClick={(e) => handleTogglePrompt(e, index)}
@@ -114,7 +106,6 @@ const EmptyState = () => {
                         </IconButton>
                       </Tooltip>
                     </Paper>
-                    {/* 条件渲染提示词，并用Box占位防止布局跳动 */}
                     <Box sx={{ minHeight: { xs: '140px', md: '120px' } }}>
                       {activeIndex === index && (
                         <PromptDisplay prompt={ex.prompt} onCopy={() => setSnackbarOpen(true)} />
@@ -135,7 +126,6 @@ const EmptyState = () => {
     </>
   );
 };
-// ============================================================
 
 export default function OutputVideosDisplay({ isLoading, generatedVideosInGCS, generatedCount }: { isLoading: boolean; generatedVideosInGCS: VideoI[]; generatedCount: number; }) {
   const [videoFullScreen, setVideoFullScreen] = useState<VideoI | undefined>();
@@ -146,7 +136,38 @@ export default function OutputVideosDisplay({ isLoading, generatedVideosInGCS, g
 
   const handleCloseVideoFullScreen = () => { if (fullScreenVideoRef.current) { fullScreenVideoRef.current.pause(); fullScreenVideoRef.current.currentTime = 0; } setVideoFullScreen(undefined); };
   const handleVideoExportClose = () => setVideoToExport(undefined);
-  const handleDLvideo = async (video: VideoI) => { setIsDLloading(true); try { const res = await downloadMediaFromGcs(video.gcsUri); downloadBase64Media(res.data, `${video.key}.${video.format.toLowerCase()}`, video.format); if (typeof res === 'object' && res.error) throw Error(res.error.replaceAll('Error: ', '')); } catch (error: any) { console.error(error); } finally { setIsDLloading(false); } };
+
+  const handleDLvideo = async (video: VideoI) => {
+    setIsDLloading(true);
+    try {
+      // ======================= 【核心修改】: 获取用户和 Token =======================
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error("用户未登录，无法下载媒体文件。");
+      }
+      const idToken = await user.getIdToken(true);
+      // ========================================================================
+
+      // 【核心修改】: 传递 idToken
+      const res = await downloadMediaFromGcs(video.gcsUri, idToken);
+
+      if (typeof res === 'object' && res.error) {
+        throw new Error(res.error.replaceAll('Error: ', ''));
+      }
+      if (!res.data) {
+        throw new Error("下载成功，但未返回任何数据。");
+      }
+
+      downloadBase64Media(res.data, `${video.key}.${video.format.toLowerCase()}`, video.format);
+
+    } catch (error: any) {
+      console.error(error);
+      alert(`下载失败: ${error.message || "未知错误"}`);
+    } finally {
+      setIsDLloading(false);
+    }
+  };
 
   if (isLoading) {
     return (

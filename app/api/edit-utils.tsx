@@ -189,7 +189,7 @@ export const EditImageFormFields = {
  personGeneration: {
   label: '人物生成', // [汉化]
   type: 'select',
-  default: 'allow_adult',
+  default: 'allow_all',
   options: [
    { value: 'dont_allow', label: '不允许人物' }, // [汉化]
    { value: 'allow_adult', label: '仅限成人' }, // [汉化]

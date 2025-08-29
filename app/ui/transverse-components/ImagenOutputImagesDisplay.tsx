@@ -1,4 +1,3 @@
-// 文件路径: app/ui/transverse-components/ImagenOutputImagesDisplay.tsx
 
 'use client';
 
@@ -21,6 +20,7 @@ import { appContextDataDefault, useAppContext } from '../../context/app-context'
 import { useRouter } from 'next/navigation';
 import { downloadMediaFromGcs } from '@/app/api/cloud-storage/action';
 import { CustomDarkTooltip } from '../ux-components/Tooltip';
+import { getAuth } from 'firebase/auth'; // <-- 【核心修改】导入 getAuth
 
 interface ExampleImage { image: string; prompt: string; }
 
@@ -60,7 +60,6 @@ const EmptyState = () => {
     { image: '/examples/111.png', prompt: 'A winning touchdown, fast shutter speed, movement tracking' },
     { image: '/examples/333.png', prompt: 'Aerial shot of a river flowing up a mystical valley' },
     { image: '/examples/444.png', prompt: 'A photo of a forest canopy with blue skies from below' },
-    
   ];
 
   const handleScroll = (direction: 'left' | 'right') => {
@@ -142,7 +141,34 @@ export default function OutputImagesDisplay({ isLoading, generatedImagesInGCS, g
   const handleMoreLikeThisClick = (prompt: string) => { setAppContext((prev) => ({ ...(prev ?? appContextDataDefault), promptToGenerateImage: prompt, promptToGenerateVideo: '' })); };
   const handleEditClick = (imageGcsURI: string) => { setAppContext((prev) => ({ ...(prev ?? appContextDataDefault), imageToEdit: imageGcsURI })); router.push('/edit'); };
   const handleITVClick = (imageGcsURI: string) => { setAppContext((prev) => ({ ...(prev ?? appContextDataDefault), imageToVideo: imageGcsURI })); router.push('/generate?mode=video'); };
-  const handleDLimage = async (image: ImageI) => { try { const res = await downloadMediaFromGcs(image.gcsUri); downloadBase64Media(res.data, `${image.key}.${image.format.toLowerCase()}`, image.format); if (typeof res === 'object' && res.error) throw Error(res.error.replaceAll('Error: ', '')); } catch (error: any) { throw Error(error); } };
+
+  // ======================= 【核心修改】: 修复 handleDLimage 函数 =======================
+  const handleDLimage = async (image: ImageI) => {
+    try {
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error("用户未登录，无法下载媒体文件。");
+      }
+      const idToken = await user.getIdToken(true);
+
+      const res = await downloadMediaFromGcs(image.gcsUri, idToken);
+
+      if (typeof res === 'object' && res.error) {
+        throw new Error(res.error.replaceAll('Error: ', ''));
+      }
+      if (!res.data) {
+        throw new Error("下载成功，但未返回任何数据。");
+      }
+
+      downloadBase64Media(res.data, `${image.key}.${image.format.toLowerCase()}`, image.format);
+
+    } catch (error: any) {
+      console.error("Download failed:", error);
+      alert(`下载失败: ${error.message || "未知错误"}`);
+    }
+  };
+  // ========================================================================
 
   if (isLoading) {
     return (
@@ -158,12 +184,10 @@ export default function OutputImagesDisplay({ isLoading, generatedImagesInGCS, g
     return <EmptyState />;
   }
 
-  // ==================== 这是核心修改区域 ====================
   return (
     <>
       <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'center' }}>
         {generatedImagesInGCS.length === 1 ? (
-          // --- 1. 单张图片的渲染路径 ---
           (() => {
             const image = generatedImagesInGCS[0];
             return (
@@ -227,7 +251,6 @@ export default function OutputImagesDisplay({ isLoading, generatedImagesInGCS, g
             );
           })()
         ) : (
-          // --- 2. 多张图片的渲染路径 (保持不变) ---
           <ImageList cols={2} gap={16} sx={{ m: 0, flexGrow: 1, overflowY: 'auto' }}>
             {generatedImagesInGCS.map((image) => (
               <Paper key={image.key} elevation={3} sx={{ borderRadius: 3, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -278,7 +301,6 @@ export default function OutputImagesDisplay({ isLoading, generatedImagesInGCS, g
         )}
       </Box>
 
-      {/* Modals 和 Snackbars 保持在外部，以便所有情况都能调用 */}
       {imageFullScreen && (<Modal open={!!imageFullScreen} onClose={() => setImageFullScreen(undefined)} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Box sx={{ maxHeight: '90vh', maxWidth: '90vw' }}><Image src={imageFullScreen.src} alt={'displayed-image'} width={imageFullScreen.width} height={imageFullScreen.height} style={{ width: 'auto', height: 'auto', maxHeight: '90vh', maxWidth: '90vw', objectFit: 'contain' }} quality={100} /></Box></Modal>)}
       <ExportStepper open={!!imageToExport} upscaleAvailable={true} mediaToExport={imageToExport} handleMediaExportClose={() => setImageToExport(undefined)} />
       <DownloadDialog open={!!imageToDL} mediaToDL={imageToDL} handleMediaDLClose={() => setImageToDL(undefined)} />

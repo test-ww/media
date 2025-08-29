@@ -1,130 +1,71 @@
 {
-  "contextAuthorTeam": {
-    "label": "您在哪个团队？",
-    "name": "所属团队",
+  "contextAssetType": {
+    "label": "这个素材的核心资产类型是什么？",
+    "name": "资产类型",
     "type": "multiple-select",
     "isUpdatable": true,
     "isMandatory": true,
     "isExportVisible": true,
     "isExploreVisible": true,
     "options": [
-      {
-        "value": "marketing",
-        "label": "内容营销"
-      },
-      {
-        "value": "communityManagement",
-        "label": "社区管理"
-      },
-      {
-        "value": "hr",
-        "label": "人力资源"
-      },
-      {
-        "value": "product",
-        "label": "产品开发"
-      },
-      {
-        "value": "sales",
-        "label": "销售支持"
-      }
+      { "value": "marketingMaterial", "label": "广告/市场素材" },
+      { "value": "socialMediaContent", "label": "社交媒体内容" },
+      { "value": "ecommerceProductImage", "label": "电商产品图" },
+      { "value": "gameCharacterConcept", "label": "游戏-角色概念" },
+      { "value": "gameEnvironmentConcept", "label": "游戏-场景概念" },
+      { "value": "gamePropOrItem", "label": "游戏-道具/物品" },
+      { "value": "uiOrIcon", "label": "UI/图标" },
+      { "value": "internalConcept", "label": "内部概念/草稿" }
     ]
   },
-  "contextTargetPlatform": {
-    "label": "它的目标平台是什么？",
-    "name": "目标平台",
+  "contextSubjectMatter": {
+    "label": "素材画面中主要包含什么？",
+    "name": "主体内容",
     "type": "multiple-select",
     "isUpdatable": true,
     "isMandatory": true,
     "isExportVisible": true,
     "isExploreVisible": true,
     "options": [
-      {
-        "value": "mailing",
-        "label": "邮件营销"
-      },
-      {
-        "value": "website",
-        "label": "公共网站"
-      },
-      {
-        "value": "socialMedias",
-        "label": "社交媒体"
-      },
-      {
-        "value": "product",
-        "label": "产品开发"
-      }
+      { "value": "humanModel", "label": "人物/模特" },
+      { "value": "productOnly", "label": "仅产品" },
+      { "value": "productInScene", "label": "场景中的产品" },
+      { "value": "environmentOrLandscape", "label": "环境/风景" },
+      { "value": "abstractOrTexture", "label": "抽象/纹理" },
+      { "value": "textAndLogo", "label": "文字与Logo" }
     ]
   },
-  "contextAssociatedBrand": {
-    "label": "您为哪个品牌创建了此图片？",
-    "name": "相关品牌",
+  "contextArtisticStyle": {
+    "label": "它的艺术风格是？",
+    "name": "艺术风格",
     "type": "multiple-select",
     "isUpdatable": true,
     "isMandatory": false,
     "isExportVisible": true,
     "isExploreVisible": true,
     "options": [
-      {
-        "value": "gemo",
-        "label": "Gémo"
-      },
-      {
-        "value": "mellowYellow",
-        "label": "Mellow Yellow"
-      },
-      {
-        "value": "bocage",
-        "label": "Bocage"
-      },
-      {
-        "value": "maje",
-        "label": "Maje"
-      },
-      {
-        "value": "bash",
-        "label": "Ba&sh"
-      },
-      {
-        "value": "sessun",
-        "label": "Sessùn"
-      },
-      {
-        "value": "americanVintage",
-        "label": "American Vintage"
-      },
-      {
-        "value": "theKooples",
-        "label": "The Kooples"
-      }
+      { "value": "photorealistic", "label": "写实摄影" },
+      { "value": "3dRender", "label": "三维渲染" },
+      { "value": "animeAndCartoon", "label": "动漫/卡通" },
+      { "value": "digitalPainting", "label": "数字绘画" },
+      { "value": "cyberpunk", "label": "赛博朋克" },
+      { "value": "fantasy", "label": "魔幻/奇幻" },
+      { "value": "minimalist", "label": "极简主义" }
     ]
   },
-  "contextCollection": {
-    "label": "它与哪个系列相关？",
-    "name": "相关系列",
-    "type": "multiple-select",
+  "contextApprovalStatus": {
+    "label": "这个素材的当前状态是？",
+    "name": "审核状态",
+    "type": "single-select",
     "isUpdatable": true,
-    "isMandatory": false,
+    "isMandatory": true,
     "isExportVisible": true,
     "isExploreVisible": true,
     "options": [
-      {
-        "value": "spring",
-        "label": "春季"
-      },
-      {
-        "value": "summer",
-        "label": "夏季"
-      },
-      {
-        "value": "fall",
-        "label": "秋季"
-      },
-      {
-        "value": "winter",
-        "label": "冬季"
-      }
+      { "value": "draft", "label": "草稿" },
+      { "value": "inReview", "label": "审核中" },
+      { "value": "approved", "label": "已批准" },
+      { "value": "requiresRevision", "label": "需要修改" }
     ]
   }
 }

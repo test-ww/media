@@ -1,21 +1,21 @@
-// 文件路径: app/(studio)/library/page.tsx
+// 文件路径: app/(studio)/library/page.tsx (最终完整版)
 'use client'
 export const dynamic = 'force-dynamic';
 import * as React from 'react'
 import Box from '@mui/material/Box'
 import { useCallback, useEffect, useState } from 'react'
-
 import { Button, Collapse, IconButton, Stack, Typography } from '@mui/material'
-
-import theme from '../../theme'
+import theme from '../../../theme'
 import { getSignedURL } from '@/app/api/cloud-storage/action'
 import { ExportAlerts } from '@/app/ui/transverse-components/ExportAlerts'
 import { fetchDocumentsInBatches, firestoreDeleteBatch } from '@/app/api/firestore/action'
 import { MediaMetadataI, MediaMetadataWithSignedUrl } from '@/app/api/export-utils'
-import LibraryMediasDisplay from '../../ui/library-components/LibraryMediasDisplay'
-import LibraryFiltering from '../../ui/library-components/LibraryFiltering'
+import LibraryMediasDisplay from '../../../ui/library-components/LibraryMediasDisplay'
+import LibraryFiltering from '../../../ui/library-components/LibraryFiltering'
 import { CustomizedSendButton } from '@/app/ui/ux-components/Button-SX'
 import { Autorenew, Close, Delete, TouchApp, WatchLater } from '@mui/icons-material'
+import { getAuth } from 'firebase/auth'; // <-- 【核心修改】导入 getAuth
+
 const { palette } = theme
 
 const iconSx = {
@@ -26,7 +26,7 @@ const iconSx = {
     color: palette.primary.main,
     fontSize: '1.5rem',
   },
-}
+} as const;
 
 export default function Page() {
   const [errorMsg, setErrorMsg] = useState('')
@@ -41,7 +41,7 @@ export default function Page() {
   const [deletionSuccess, setDeletionSuccess] = useState(false)
   const [selectedIdsForDeletion, setSelectedIdsForDeletion] = useState<string[]>([])
 
-   const fetchDataAndSignedUrls = useCallback(
+  const fetchDataAndSignedUrls = useCallback(
     async (currentFiltersArg: any, explicitFetchCursor: any | null, isReplacingExistingData: boolean) => {
       setIsMediasLoading(true);
       if (isReplacingExistingData) {
@@ -58,11 +58,21 @@ export default function Page() {
         }, {} as any);
 
       try {
+        // ======================= 【核心修改】: 获取用户和 Token =======================
+        const auth = getAuth();
+        const user = auth.currentUser;
+        if (!user) {
+          throw new Error("用户未登录，无法获取媒体库。");
+        }
+        const idToken = await user.getIdToken(true);
+        // ========================================================================
+
         let res;
+        // 【核心修改】: 将 idToken 作为第一个参数传递
         if (Object.values(selectedFilters).length === 0) {
-          res = await fetchDocumentsInBatches(explicitFetchCursor);
+          res = await fetchDocumentsInBatches(idToken, explicitFetchCursor);
         } else {
-          res = await fetchDocumentsInBatches(explicitFetchCursor, selectedFilters);
+          res = await fetchDocumentsInBatches(idToken, explicitFetchCursor, selectedFilters);
         }
 
         if (res.error) {
@@ -73,11 +83,8 @@ export default function Page() {
 
         if (isReplacingExistingData) {
           const hasOldFormat = documents.some((doc: any) => Object.prototype.hasOwnProperty.call(doc, 'imageID'));
-
           if (hasOldFormat) {
-            setErrorMsg(
-              "注意：为确保与 ImgStudio 中新的 Veo 功能兼容，必须更新 Firestore 元数据数据库。请让您的系统管理员执行位于应用代码库中 library-update-script.md 文件里提供的说明。"
-            );
+            setErrorMsg("注意：为确保与 ImgStudio 中新的 Veo 功能兼容，必须更新 Firestore 元数据数据库。请让您的系统管理员执行位于应用代码库中 library-update-script.md 文件里提供的说明。");
             setIsMediasLoading(false);
             setFetchedMediasByPage([]);
             setLastVisibleDocument(null);
@@ -104,17 +111,15 @@ export default function Page() {
               return { ...doc, signedUrl: '', gcsURIError: true } as MediaMetadataWithSignedUrl;
             }
             try {
-              // 【核心修复】: 正确处理 getSignedURL 的返回类型
               const signedUrlResult = await getSignedURL(doc.gcsURI);
               if (typeof signedUrlResult === 'object' && 'error' in signedUrlResult) {
                 throw new Error(String(signedUrlResult.error).replaceAll('Error: ', ''));
               }
-              const finalSignedUrl = signedUrlResult; // 如果没有错误，它就是一个字符串
+              const finalSignedUrl = signedUrlResult;
 
               let finalThumbnailSignedUrl: string | null = null;
               if (doc.videoThumbnailGcsUri && doc.videoThumbnailGcsUri.startsWith('gs://')) {
                 const thumbnailResult = await getSignedURL(doc.videoThumbnailGcsUri);
-                // 【核心修复】: 同样地，正确处理缩略图的返回类型
                 if (typeof thumbnailResult === 'object' && 'error' in thumbnailResult) {
                   throw new Error(String(thumbnailResult.error).replaceAll('Error: ', ''));
                 }
@@ -138,7 +143,6 @@ export default function Page() {
 
         const documentsWithSignedUrls = resolvedDocs.filter((doc): doc is MediaMetadataWithSignedUrl => {
             if (!doc || !doc.signedUrl || doc.gcsURIError) return false;
-            // 检查是否为 VideoI 类型
             if ('duration' in doc && doc.format === 'MP4') {
                 return !!doc.videoThumbnailSignedUrl;
             }
@@ -155,7 +159,6 @@ export default function Page() {
       } catch (error: any) {
         console.error(error);
         setErrorMsg(`获取媒体时发生错误。请重试。`);
-
         if (isReplacingExistingData) {
           setFetchedMediasByPage([]);
           setLastVisibleDocument(null);
@@ -200,8 +203,18 @@ export default function Page() {
       setErrorMsg('')
       setDeletionSuccess(false)
       try {
+        // ======================= 【核心修改】: 获取用户和 Token =======================
+        const auth = getAuth();
+        const user = auth.currentUser;
+        if (!user) {
+          throw new Error("用户未登录，无法执行删除操作。");
+        }
+        const idToken = await user.getIdToken(true);
+        // ========================================================================
+
         const allFetchedMedias: MediaMetadataI[] = fetchedMediasByPage.flat();
-        const result = await firestoreDeleteBatch(selectedIdsForDeletion, allFetchedMedias)
+        // 【核心修改】: 将 idToken 作为第三个参数传递
+        const result = await firestoreDeleteBatch(selectedIdsForDeletion, allFetchedMedias, idToken)
 
         if (result === true) {
           await fetchDataAndSignedUrls(filters ?? {}, null, true)

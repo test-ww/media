@@ -1,16 +1,18 @@
-// 文件路径: app/ui/generate-components/ReferenceBox.tsx (最终汉化修复版)
+"use client"; // <-- 确保这是客户端组件
 
-import React, { useState } from 'react'
-import { Box, IconButton, Stack, CircularProgress } from '@mui/material'
-import theme from '../../theme'
-import ImageDropzone from './ImageDropzone'
-import { maxReferences, ReferenceObjectI, referenceTypeField } from '@/app/api/generate-image-utils'
-import { FormInputTextLine } from '../ux-components/InputTextLine'
-import FormInputChipGroup from '../ux-components/InputChipGroup'
-import { Clear, ForkLeftSharp } from '@mui/icons-material'
-import { GeminiButton } from '../ux-components/GeminiButton'
-import { cleanResult, getDescriptionFromGemini } from '@/app/api/gemini/action'
-const { palette } = theme
+import React, { useState } from 'react';
+import { Box, IconButton, Stack, CircularProgress } from '@mui/material';
+import theme from '../../theme';
+import ImageDropzone from './ImageDropzone';
+import { maxReferences, ReferenceObjectI, referenceTypeField } from '@/app/api/generate-image-utils';
+import { FormInputTextLine } from '../ux-components/InputTextLine';
+import FormInputChipGroup from '../ux-components/InputChipGroup';
+import { Clear, ForkLeftSharp } from '@mui/icons-material';
+import { GeminiButton } from '../ux-components/GeminiButton';
+import { getDescriptionFromGemini } from '@/app/api/gemini/action';
+import { getAuth } from 'firebase/auth'; // <-- 【核心修改】导入 getAuth
+
+const { palette } = theme;
 
 // [核心] 在组件外部定义汉化后的字段，避免在组件内部重复创建
 const translatedReferenceTypeField = {
@@ -36,53 +38,69 @@ export const ReferenceBox = ({
  refPosition,
  refCount,
 }: {
- objectKey: string
- currentReferenceObject: ReferenceObjectI
- onNewErrorMsg: (msg: string) => void
- control: any
- setValue: any
- removeReferenceObject: (objectKey: string) => void
- addAdditionalRefObject: (objectKey: string) => void
- refPosition: number
- refCount: number
+ objectKey: string;
+ currentReferenceObject: ReferenceObjectI;
+ onNewErrorMsg: (msg: string) => void;
+ control: any;
+ setValue: any;
+ removeReferenceObject: (objectKey: string) => void;
+ addAdditionalRefObject: (objectKey: string) => void;
+ refPosition: number;
+ refCount: number;
 }) => {
  const noImageSet =
-  currentReferenceObject.base64Image === '' ||
-  currentReferenceObject.base64Image === null ||
-  currentReferenceObject.base64Image === undefined
+  !currentReferenceObject.base64Image;
  const noDescriptionSet =
-  currentReferenceObject.description === '' ||
-  currentReferenceObject.description === null ||
-  currentReferenceObject.description === undefined
+  !currentReferenceObject.description;
  const noReferenceTypeSet =
-  currentReferenceObject.referenceType === '' ||
-  currentReferenceObject.referenceType === null ||
-  currentReferenceObject.referenceType === undefined
- const isNewRef = noImageSet && noReferenceTypeSet && noDescriptionSet
- const isRefIncomplete = noImageSet || noReferenceTypeSet || noDescriptionSet
+  !currentReferenceObject.referenceType;
+ const isNewRef = noImageSet && noReferenceTypeSet && noDescriptionSet;
+ const isRefIncomplete = noImageSet || noReferenceTypeSet || noDescriptionSet;
 
- let IDoptions = []
- for (let i = 1; i <= maxReferences; i++) IDoptions.push({ value: i.toString(), label: i.toString() })
+ let IDoptions = [];
+ for (let i = 1; i <= maxReferences; i++) IDoptions.push({ value: i.toString(), label: i.toString() });
 
- const [isGettingDescription, setIsGettingDescription] = useState(false)
+ const [isGettingDescription, setIsGettingDescription] = useState(false);
 
  const getDescription = async () => {
-  setIsGettingDescription(true)
-  if (!noReferenceTypeSet && !noImageSet)
-   try {
-    const geminiReturnedDescription = await getDescriptionFromGemini(
-     currentReferenceObject.base64Image,
-     currentReferenceObject.referenceType
-    )
+    // ======================= 【核心修改】: 获取并传递 Token =======================
+    const auth = getAuth();
+    const user = auth.currentUser;
 
-    if (!(typeof geminiReturnedDescription === 'object' && 'error' in geminiReturnedDescription))
-     setValue(`referenceObjects.${refPosition}.description`, geminiReturnedDescription as string)
-   } catch (error) {
-    console.error(error)
-   } finally {
-    setIsGettingDescription(false)
-   }
- }
+    if (!user) {
+        onNewErrorMsg("用户未登录，无法执行此操作。");
+        return;
+    }
+    // ========================================================================
+
+    if (noReferenceTypeSet || noImageSet) {
+        onNewErrorMsg("请先上传图片并选择参考类型。");
+        return;
+    }
+
+    setIsGettingDescription(true);
+    try {
+        // ======================= 【核心修改】: 获取并传递 Token =======================
+        const idToken = await user.getIdToken(true); // 获取用户的认证令牌
+        const geminiReturnedDescription = await getDescriptionFromGemini(
+            currentReferenceObject.base64Image,
+            currentReferenceObject.referenceType,
+            idToken // 将令牌作为第三个参数传递
+        );
+        // ========================================================================
+
+        if (typeof geminiReturnedDescription === 'object' && 'error' in geminiReturnedDescription) {
+            onNewErrorMsg(geminiReturnedDescription.error);
+        } else {
+            setValue(`referenceObjects.${refPosition}.description`, geminiReturnedDescription as string);
+        }
+    } catch (error: any) {
+        console.error("Error in getDescription:", error);
+        onNewErrorMsg(error.message || "获取描述时发生未知错误。");
+    } finally {
+        setIsGettingDescription(false);
+    }
+ };
 
  return (
   <Stack
@@ -128,13 +146,11 @@ export const ReferenceBox = ({
      <Box sx={{ width: '30%' }}>
       <FormInputChipGroup
        name={`referenceObjects.${refPosition}.referenceType`}
-        // [核心] 使用汉化后的字段
        label={translatedReferenceTypeField.label}
        key={objectKey + refPosition + '_type'}
        control={control}
        setValue={setValue}
        width="100%"
-        // [核心] 使用汉化后的字段
        field={translatedReferenceTypeField}
        required={false}
        disabled={noImageSet}
@@ -146,7 +162,6 @@ export const ReferenceBox = ({
         <FormInputTextLine
          key={objectKey + refPosition + '_description'}
          control={control}
-            // [核心] 汉化标签
          label={'简短描述 (Short description)'}
          name={`referenceObjects.${refPosition}.description`}
          value={currentReferenceObject.description}
@@ -173,5 +188,5 @@ export const ReferenceBox = ({
     </Box>
    )}
   </Stack>
- )
-}
+ );
+};

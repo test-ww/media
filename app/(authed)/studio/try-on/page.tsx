@@ -7,10 +7,10 @@ import { useState } from 'react';
 import { Paper, Grid } from '@mui/material';
 
 // 直接导入组件，因为整个页面已经是动态的了
-import VirtualTryOnForm from '../../ui/try-on-components/VirtualTryOnForm';
-import TryOnResultDisplay from '../../ui/try-on-components/TryOnResultDisplay';
-import { virtualTryOnFields } from '../../api/virtual-try-on-utils';
-import { ImageI } from '../../api/generate-image-utils';
+import VirtualTryOnForm from '../../../ui/try-on-components/VirtualTryOnForm';
+import TryOnResultDisplay from '../../../ui/try-on-components/TryOnResultDisplay';
+import { virtualTryOnFields } from '../../../api/virtual-try-on-utils';
+import { ImageI } from '../../../api/generate-image-utils';
 
 export default function TryOnPage() {
   const [isLoading, setIsLoading] = useState(false);

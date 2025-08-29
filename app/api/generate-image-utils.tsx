@@ -493,6 +493,8 @@ export interface ImageI {
  author: string
  modelVersion: string
  mode: string
+ warning?: string
+ error?: string
 }
 
 export const RatioToPixel = [

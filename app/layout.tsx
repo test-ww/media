@@ -4,11 +4,11 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import theme from './theme';
 import { ContextProvider } from './context/app-context';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider } from './context/AuthProvider'; // <-- 1. 导入 AuthProvider
 import './globals.css';
 
 export const metadata = {
-  title: 'ImgStudio',
+  title: 'CloudPuppy',
   description: 'Interface to generate & edit images using Google model Imagen',
 };
 
@@ -19,17 +19,16 @@ export default function RootLayout(props: { children: React.ReactNode }) {
         <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
       </head>
       <body>
-        {/* 我们不再需要 Providers.tsx，直接在这里包裹 Context */}
-        <AuthProvider>
-          <ContextProvider>
+        <ContextProvider>
+          <AuthProvider> {/* <-- 2. 在 ContextProvider 内部包裹 AuthProvider */}
             <AppRouterCacheProvider options={{ enableCssLayer: true }}>
               <ThemeProvider theme={theme}>
                 <CssBaseline />
                 {props.children}
               </ThemeProvider>
             </AppRouterCacheProvider>
-          </ContextProvider>
-        </AuthProvider>
+          </AuthProvider>
+        </ContextProvider>
       </body>
     </html>
   );

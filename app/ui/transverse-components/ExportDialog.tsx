@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { useEffect, useState } from 'react'
+import { getAuth } from 'firebase/auth'; // <-- 【核心修改】导入 getAuth
 
 import {
   Dialog,
@@ -71,6 +72,8 @@ export const downloadBase64Media = (base64Data: any, filename: string, format: s
   document.body.removeChild(link)
 }
 
+// 【注意】: 您之前提供的代码中，组件名为 ExportStepper，我将沿用此名。
+// 如果您的文件名是 ExportDialog.tsx，请将下面的函数名也改为 ExportDialog
 export default function ExportStepper({
   open,
   upscaleAvailable,
@@ -163,58 +166,66 @@ export default function ExportStepper({
 
   const handleImageExportSubmit: SubmitHandler<ExportMediaFormI> = React.useCallback(
     async (formData: ExportMediaFormI) => {
+      // ======================= 【核心修改】: 获取用户和 Token =======================
+      const auth = getAuth();
+      const user = auth.currentUser;
+
+      if (!user) {
+          setErrorMsg("用户未登录，无法执行操作。请刷新页面或重新登录。");
+          setIsExporting(false);
+          return;
+      }
+      // ========================================================================
+
       setIsExporting(true);
-      setExportStatus('正在开始...'); // [汉化]
+      setExportStatus('正在开始...');
 
       const media = formData.mediaToExport ? { ...formData.mediaToExport } : undefined;
 
       if (!media) {
-          setErrorMsg("要导出的媒体不存在。"); // [汉化]
+          setErrorMsg("要导出的媒体不存在。");
           setIsExporting(false);
           return;
       }
 
       try {
+        // ======================= 【核心修改】: 获取并准备 Token =======================
+        const idToken = await user.getIdToken(true);
+        // ========================================================================
+
         // 1. Upscale if needed
         if (formData.upscaleFactor === 'x2' || formData.upscaleFactor === 'x4') {
-          setExportStatus('正在放大...'); // [汉化]
-          const res = await upscaleImage({ uri: media.gcsUri }, formData.upscaleFactor, appContext);
-
-          if (typeof res === 'object' && res.error) {
-            throw new Error(res.error.replaceAll('Error: ', ''));
-          }
-
+          setExportStatus('正在放大...');
+          // 【核心修改】: 为 upscaleImage 传递 idToken
+          const res = await upscaleImage({ uri: media.gcsUri }, formData.upscaleFactor, appContext, idToken);
+          if (typeof res === 'object' && res.error) throw new Error(res.error.replaceAll('Error: ', ''));
           if (res.newGcsUri && typeof res.newGcsUri === 'string') {
-              media.gcsUri = res.newGcsUri;
-              media.width = media.width * parseInt(formData.upscaleFactor.replace(/[^0-9]/g, ''));
-              media.height = media.height * parseInt(formData.upscaleFactor.replace(/[^0-9]/g, ''));
+            media.gcsUri = res.newGcsUri;
+            media.width = media.width * parseInt(formData.upscaleFactor.replace(/[^0-9]/g, ''));
+            media.height = media.height * parseInt(formData.upscaleFactor.replace(/[^0-9]/g, ''));
           } else {
-              throw new Error("Upscaling completed, but did not return a new image URI.");
+            throw new Error("Upscaling completed, but did not return a new image URI.");
           }
         }
 
         // 2. Copy media to team library
-        setExportStatus('正在导出...'); // [汉化]
+        setExportStatus('正在导出...');
         const currentGcsUri = media.gcsUri;
         const id = media.key;
-        const newGcsUri = await copyImageToTeamBucket(currentGcsUri, id);
+        // 【核心修改】: 为 Cloud Storage 操作传递 idToken
+        const newGcsUri = await copyImageToTeamBucket(currentGcsUri, id, idToken);
         media.gcsUri = newGcsUri;
 
         // 2.5. If media is a video, upload its thumbnail
-        if ('duration' in media && media.format === 'MP4') { // Type guard to check if it's a VideoI
-          setExportStatus('正在生成缩略图...'); // [汉化]
-          const result = await getVideoThumbnailBase64(media.gcsUri, media.ratio);
-          if (!result.thumbnailBase64Data) {
-              console.error('Failed to generate thumbnail:', result.error);
-          }
+        if ('duration' in media && media.format === 'MP4') {
+          setExportStatus('正在生成缩略图...');
+          // 【核心修改】: 为 Cloud Storage 操作传递 idToken
+          const result = await getVideoThumbnailBase64(media.gcsUri, media.ratio, idToken);
+          if (!result.thumbnailBase64Data) console.error('Failed to generate thumbnail:', result.error);
           const thumbnailBase64Data = result.thumbnailBase64Data;
           if (thumbnailBase64Data && process.env.NEXT_PUBLIC_TEAM_BUCKET) {
-            const uploadResult = await uploadBase64Image(
-              thumbnailBase64Data,
-              process.env.NEXT_PUBLIC_TEAM_BUCKET,
-              `${id}_thumbnail.png`,
-              'image/png'
-            );
+            // 【核心修改】: 为 Cloud Storage 操作传递 idToken
+            const uploadResult = await uploadBase64Image(thumbnailBase64Data, process.env.NEXT_PUBLIC_TEAM_BUCKET, `${id}_thumbnail.png`, 'image/png', idToken);
             if (uploadResult.success && uploadResult.fileUrl) {
               formData.videoThumbnailGcsUri = uploadResult.fileUrl;
             } else {
@@ -227,27 +238,25 @@ export default function ExportStepper({
         }
 
         // 3. Upload metadata to firestore
-        setExportStatus('正在保存数据...'); // [汉化]
+        setExportStatus('正在保存数据...');
         if (exportMediaFormFields) {
           formData.mediaToExport = media;
-          const res = await saveMediaToLibrary(id, formData, exportMediaFormFields);
+          // 【核心修改】: 将 idToken 传递给 saveMediaToLibrary
+          const res = await saveMediaToLibrary(id, formData, exportMediaFormFields, idToken);
           if (typeof res === 'object' && res.error) {
             throw new Error(res.error.replaceAll('Error: ', ''));
           }
         } else {
-          throw new Error("找不到 exportMediaFormFields"); // [汉化]
+          throw new Error("找不到 exportMediaFormFields");
         }
 
         // 4. DL locally if asked to
         if (isDownload) {
-          setExportStatus('正在准备下载...'); // [汉化]
-          const downloadResponse = await downloadMediaFromGcs(media.gcsUri);
-          if (typeof downloadResponse === 'object' && downloadResponse.error) {
-            throw new Error(downloadResponse.error.replaceAll('Error: ', ''));
-          }
-          if (!downloadResponse.data) {
-              throw new Error("Downloaded media data is empty.");
-          }
+          setExportStatus('正在准备下载...');
+          // 【核心修改】: 为 Cloud Storage 操作传递 idToken
+          const downloadResponse = await downloadMediaFromGcs(media.gcsUri, idToken);
+          if (typeof downloadResponse === 'object' && downloadResponse.error) throw new Error(downloadResponse.error.replaceAll('Error: ', ''));
+          if (!downloadResponse.data) throw new Error("Downloaded media data is empty.");
           const name = `${media.key}.${media.format.toLowerCase()}`;
           downloadBase64Media(downloadResponse.data, name, media.format);
         }
@@ -257,7 +266,7 @@ export default function ExportStepper({
         onClose();
       } catch (error: any) {
         console.error(error);
-        const errorMessage = error instanceof Error ? error.message : '导出过程中发生未知错误。'; // [汉化]
+        const errorMessage = error instanceof Error ? error.message : '导出过程中发生未知错误。';
         setErrorMsg(errorMessage);
         setIsExporting(false);
         setExportStatus('');
@@ -330,7 +339,6 @@ export default function ExportStepper({
     return (
       <>
         <Typography variant="subtitle1" color={palette.secondary.main} sx={{ pl: 1, width: '85%' }}>
-          {/* [汉化] */}
           {'设置元数据以确保在共享库中的可发现性。'}
         </Typography>
 
@@ -364,7 +372,6 @@ export default function ExportStepper({
     return (
       <>
         <Typography variant="subtitle1" color={palette.secondary.main} sx={{ pl: 1, width: '70%' }}>
-          {/* [汉化] */}
           {'提升分辨率以获得更清晰锐利的外观。'}
         </Typography>
         <Controller
@@ -373,7 +380,6 @@ export default function ExportStepper({
           render={({ field }) => (
             <RadioGroup {...field} sx={{ p: 2, pl: 3 }}>
               <CustomRadio
-                // [汉化]
                 label="不放大"
                 subLabel={mediaToExport ? `${mediaToExport.width} x ${mediaToExport.height} px` : ''}
                 value="no"
@@ -381,11 +387,10 @@ export default function ExportStepper({
                 enabled={true}
               />
               <CustomRadio
-                // [汉化]
                 label="放大 x2"
                 subLabel={
                   mediaToExport && isTooLarge(mediaToExport.width * 2, mediaToExport.height * 2)
-                    ? '不可用，图片尺寸过大' // [汉化]
+                    ? '不可用，图片尺寸过大'
                     : `${mediaToExport && mediaToExport.width * 2} x ${mediaToExport && mediaToExport.height * 2} px`
                 }
                 value="x2"
@@ -393,11 +398,10 @@ export default function ExportStepper({
                 enabled={mediaToExport ? !isTooLarge(mediaToExport.width * 2, mediaToExport.height * 2) : true}
               />
               <CustomRadio
-                // [汉化]
                 label="放大 x4"
                 subLabel={
                   mediaToExport && isTooLarge(mediaToExport.width * 4, mediaToExport.height * 4)
-                    ? '不可用，图片尺寸过大' // [汉化]
+                    ? '不可用，图片尺寸过大'
                     : `${mediaToExport && mediaToExport.width * 4} x ${mediaToExport && mediaToExport.height * 4} px`
                 }
                 value="x4"
@@ -420,12 +424,10 @@ export default function ExportStepper({
           endIcon={<ArrowForwardIos />}
           sx={{ ...CustomizedSendButton, ...{ fontSize: '0.8rem' } }}
         >
-          {/* [汉化] */}
           {'下一步'}
         </Button>
         {backAvailable && (
           <Button onClick={handleBack} sx={{ ...CustomizedSendButton, ...{ fontSize: '0.8rem' } }}>
-            {/* [汉化] */}
             {'返回'}
           </Button>
         )}
@@ -451,7 +453,6 @@ export default function ExportStepper({
               }}
             />
           }
-          // [汉化]
           label="导出时同时在本地下载此媒体"
           disableTypography
           sx={{
@@ -474,7 +475,6 @@ export default function ExportStepper({
             endIcon={isExporting ? <WatchLater /> : <Send />}
             sx={CustomizedSendButton}
           >
-            {/* [汉化] */}
             {exportStatus ? exportStatus : '导出'}
           </Button>
 
@@ -483,7 +483,6 @@ export default function ExportStepper({
             onClick={handleBack}
             sx={{ ...CustomizedSendButton, ...{ fontSize: '0.8rem' } }}
           >
-            {/* [汉化] */}
             {'返回'}
           </Button>
         </Box>
@@ -535,7 +534,6 @@ export default function ExportStepper({
               alignContent: 'center',
             }}
           >
-            {/* [汉化] */}
             {'导出到内部媒体库'}
           </Typography>
         </DialogTitle>
@@ -550,7 +548,6 @@ export default function ExportStepper({
           >
             <Step key="review">
               <StepLabel StepIconComponent={CustomStepIcon}>
-                {/* [汉化] */}
                 <CustomStepLabel text="审查元数据" step={0} />
               </StepLabel>
               <StepContent sx={{ px: 0, '&.MuiStepContent-root': { borderColor: 'transparent' } }}>
@@ -561,7 +558,6 @@ export default function ExportStepper({
 
             <Step key="tag">
               <StepLabel StepIconComponent={CustomStepIcon}>
-                {/* [汉化] */}
                 <CustomStepLabel text="提升可发现性" step={1} />
               </StepLabel>
               <StepContent sx={{ px: 0, '&.MuiStepContent-root': { borderColor: 'transparent' } }}>
@@ -574,7 +570,6 @@ export default function ExportStepper({
             {upscaleAvailable && (
               <Step key="upscale">
                 <StepLabel StepIconComponent={CustomStepIcon}>
-                  {/* [汉化] */}
                   <CustomStepLabel text="提升分辨率" step={2} />
                 </StepLabel>
                 <StepContent sx={{ px: 0, '&.MuiStepContent-root': { borderColor: 'transparent' } }}>

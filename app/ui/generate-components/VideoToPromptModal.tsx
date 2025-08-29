@@ -1,5 +1,3 @@
-// 文件路径: app/ui/generate-components/VideoToPromptModal.tsx (最终完整版)
-
 'use client';
 
 import * as React from 'react';
@@ -13,6 +11,7 @@ import { Check, Close, Replay, Send, Movie as MovieIcon } from '@mui/icons-mater
 import { useDropzone } from 'react-dropzone';
 import { getPromptFromVideoFromGemini } from '@/app/api/gemini/action';
 import { CustomizedSendButton } from '../ux-components/Button-SX';
+import { getAuth } from 'firebase/auth'; // <-- 【核心修改】导入 getAuth
 
 const Transition = React.forwardRef(function Transition(
   props: TransitionProps & { children: React.ReactElement<any, any> },
@@ -69,20 +68,48 @@ export default function VideoToPromptModal({ open, setNewPrompt, setVideoToPromp
       setErrorMsg('请先选择一个视频文件。');
       return;
     }
+
+    // ======================= 【核心修改】: 获取用户和 Token =======================
+    const auth = getAuth();
+    const user = auth.currentUser;
+
+    if (!user) {
+        setErrorMsg("用户未登录，无法执行操作。请刷新页面或重新登录。");
+        return;
+    }
+    // ========================================================================
+
     setIsLoading(true);
     setErrorMsg('');
     setPrompt('');
     try {
-      const formData = new FormData();
-      formData.append('file', videoFile);
-      const uploadResponse = await fetch('/api/upload', { method: 'POST', body: formData });
+        // ======================= 【核心修改】: 获取并传递 Token =======================
+        const idToken = await user.getIdToken(true); // 获取用户的认证令牌
+
+        // 注意：我们将 token 也附加到上传请求中，以备 /api/upload 也需要认证
+        const formData = new FormData();
+        formData.append('file', videoFile);
+        const uploadResponse = await fetch('/api/upload', {
+            method: 'POST',
+            headers: {
+                // 虽然 fetch FormData 不会自动设置 Content-Type，但我们可以添加 Authorization
+                'Authorization': `Bearer ${idToken}`
+            },
+            body: formData
+        });
+        // ========================================================================
+
       if (!uploadResponse.ok) {
         const errorData = await uploadResponse.json();
         throw new Error(errorData.error || '视频上传失败。');
       }
       const { gcsUri } = await uploadResponse.json();
       if (!gcsUri) throw new Error('服务器未返回 GCS URI。');
-      const geminiReturnedPrompt = await getPromptFromVideoFromGemini(gcsUri);
+
+        // ======================= 【核心修改】: 获取并传递 Token =======================
+        const geminiReturnedPrompt = await getPromptFromVideoFromGemini(gcsUri, idToken);
+        // ========================================================================
+
       if (typeof geminiReturnedPrompt === 'object' && 'error' in geminiReturnedPrompt) {
         setErrorMsg(geminiReturnedPrompt.error);
       } else {

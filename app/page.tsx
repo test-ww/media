@@ -1,28 +1,16 @@
 "use client";
 
-// 【终极解决方案】: 强制此页面为动态渲染，禁用静态生成
-// 这一行代码会告诉 Next.js 在构建时不尝试为这个页面生成静态 HTML，
-// 从而避免了在构建服务器上执行任何依赖 Firebase 的客户端代码。
-export const dynamic = 'force-dynamic';
-
 import * as React from "react";
+import { useEffect } from "react"; // 1. 导入 useEffect Hook
+import { useRouter } from "next/navigation"; // 1. 导入 useRouter Hook
 import Box from "@mui/material/Box";
 import Link from "next/link";
 import Image from "next/image";
-import { pages } from "./routes";
-// 直接导入 AuthTrigger，因为页面已经被标记为动态渲染
 import { AuthTrigger } from "./ui/ux-components/AuthTrigger";
+import { useAppContext } from "./context/app-context"; // 1. 导入 useAppContext
 
-// 专为新主页设计的导航栏组件
+// 简化后的新主页导航栏，只包含 Logo 和登录/注册按钮
 const HomePageHeader = () => {
-  const navLinks = [
-    pages.GenerateImage,
-    pages.GenerateVideo,
-    pages.VirtualTryOn,
-    pages.Edit,
-    pages.Library,
-  ];
-
   return (
     <Box
       component="header"
@@ -46,24 +34,32 @@ const HomePageHeader = () => {
           height={60}
         />
       </Link>
-
-      <Box sx={{ display: "flex", alignItems: "center", gap: "40px" }}>
-        <Box component="nav" sx={{ display: "flex", gap: "30px", alignItems: "center" }}>
-          {navLinks.map((page) =>
-            page.status === "true" || page.status === undefined ? (
-              <Link key={page.name} href={page.href} style={{ color: "white", textDecoration: "none", fontSize: "1rem" }}>
-                {page.name}
-              </Link>
-            ) : null
-          )}
-        </Box>
-        <AuthTrigger />
-      </Box>
+      <AuthTrigger />
     </Box>
   );
 };
 
 export default function Page() {
+  // 2. 获取用户状态和路由实例
+  const { appContext } = useAppContext();
+  const user = appContext?.user;
+  const isLoading = appContext?.isLoading;
+  const router = useRouter();
+
+  // 3. 添加智能重定向的副作用钩子
+  useEffect(() => {
+    // 如果还在加载用户状态，则什么都不做
+    if (isLoading) {
+      return;
+    }
+    // 如果用户存在（已登录），则立即重定向到工作室
+    if (user) {
+      router.push('/studio/generate?mode=image');
+    }
+  }, [user, isLoading, router]);
+
+  // 4. 如果用户未登录或正在重定向中，则显示公开首页内容
+  // 这确保了未登录用户能看到此页面，而已登录用户在重定向前有内容可显示
   return (
     <Box
       component="main"
@@ -121,7 +117,8 @@ export default function Page() {
           无论是生成全新概念、编辑现有图像还是制作营销视频，CloudPuppy 都是您忠实的创意助手，助您更智能、更高效地完成工作。
         </Box>
 
-        <Link href={pages.GenerateImage.href} passHref>
+        {/* 2. 将“开启创作之旅”按钮链接到工作室的默认页面 */}
+        <Link href="/studio/generate?mode=image" passHref>
           <Box
             component="button"
             sx={{

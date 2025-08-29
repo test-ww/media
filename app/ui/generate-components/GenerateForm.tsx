@@ -96,23 +96,39 @@ export default function GenerateForm({
       ? GenerateImageFormFields.modelVersion
       : GenerateVideoFormFields.modelVersion
   );
+
+  // ======================= 【核心修复】: 修复并优化 useEffect =======================
   useEffect(() => {
     if (generationType === "Image") {
-      if (referenceObjects.some((obj) => obj.base64Image !== "")) {
-        setHasReferences(true);
-        setModelOptionField(EditImageFormFields.modelVersion);
-        setValue("modelVersion", EditImageFormFields.modelVersion.default);
-      } else {
+      const newHasReferences = referenceObjects && referenceObjects.some((obj) => obj && obj.base64Image !== "");
+
+      if (newHasReferences !== hasReferences) {
+        setHasReferences(newHasReferences);
+        if (newHasReferences) {
+          console.log("Reference image added. Switching to Imagen 3 model.");
+          setModelOptionField(EditImageFormFields.modelVersion);
+          setValue("modelVersion", EditImageFormFields.modelVersion.default);
+        } else {
+          console.log("All reference images removed. Switching back to default Imagen model.");
+          setModelOptionField(GenerateImageFormFields.modelVersion);
+          setValue("modelVersion", GenerateImageFormFields.modelVersion.default);
+        }
+      }
+    } else { // 当 generationType === "Video"
+      if (hasReferences) {
         setHasReferences(false);
-        setModelOptionField(GenerateImageFormFields.modelVersion);
-        setValue("modelVersion", GenerateImageFormFields.modelVersion.default);
+      }
+      // 【最终修复】: 直接比较对象引用，这是最安全的方式
+      if (modelOptionField !== GenerateVideoFormFields.modelVersion) {
+        setModelOptionField(GenerateVideoFormFields.modelVersion);
+        // 当从图片模式切换到视频模式时，确保 modelVersion 也被重置为视频的默认值
+        setValue("modelVersion", GenerateVideoFormFields.modelVersion.default);
       }
     }
-    if (generationType === "Video") {
-      setModelOptionField(GenerateVideoFormFields.modelVersion);
-      setValue("modelVersion", GenerateVideoFormFields.modelVersion.default);
-    }
-  }, [referenceObjects, generationType, setValue]);
+  // 使用 JSON.stringify 来深度监听数组内容的变化，并监听 generationType 的变化
+  }, [JSON.stringify(referenceObjects), generationType, setValue, hasReferences, modelOptionField]);
+  // ================================================================================
+
   const removeReferenceObject = (objectKey: string) => {
     const removeReference = referenceObjects.find((obj) => obj.objectKey === objectKey);
     if (!removeReference) return;
@@ -286,7 +302,7 @@ export default function GenerateForm({
             <CustomTooltip title="重置所有字段" size="small"><IconButton disabled={isLoading} onClick={() => onReset()}><Autorenew /></IconButton></CustomTooltip>
             <GenerateSettings control={control} setValue={setValue} generalSettingsFields={currentModel === "imagen-4.0-ultra-generate-001" ? { ...generationFields.settings, ...imagenUltraSpecificSettings } : currentModel.includes("veo-3.0") ? tempVeo3specificSettings : generationFields.settings} advancedSettingsFields={generationFields.advancedSettings} warningMessage={currentModel.includes("veo-3.0") ? "注意: Veo 3 目前的设置选项比 Veo 2 少！" : ""} />
             {isAudioAvailable && (<CustomTooltip title="为视频添加音频" size="small"><AudioSwitch checked={isVideoWithAudio} onChange={handleVideoAudioCheck} /></CustomTooltip>)}
-            {currentModel.includes("imagen") && !hasReferences && (<CustomTooltip title="使用 Gemini 优化提示词" size="small"><GeminiSwitch checked={isGeminiRewrite} onChange={handleGeminiRewrite} /></CustomTooltip>)}
+            {currentModel.includes('imagen') && !hasReferences && (<CustomTooltip title="使用 Gemini 优化提示词" size="small"><GeminiSwitch checked={isGeminiRewrite} onChange={handleGeminiRewrite} /></CustomTooltip>)}
           </Stack>
 
           <Stack direction="column" spacing={2} sx={{ mt: 2 }}>

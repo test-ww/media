@@ -1,5 +1,3 @@
-// 文件路径: app/ui/try-on-components/TryOnResultDisplay.tsx
-
 'use client';
 
 import * as React from 'react';
@@ -8,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Box, Modal, ImageListItem, ImageListItemBar, Stack, Typography, IconButton, Avatar, Alert, CircularProgress } from '@mui/material';
 import { Edit, CreateNewFolderRounded, Download, VideocamRounded } from '@mui/icons-material';
+import { getAuth } from 'firebase/auth'; // <-- 【核心修改】导入 getAuth
 
 import { ImageI } from '../../api/generate-image-utils';
 import ExportStepper, { downloadBase64Media } from '../transverse-components/ExportDialog';
@@ -40,6 +39,7 @@ export default function TryOnResultDisplay({ isLoading, errorMsg, generatedImage
   const [imageFullScreen, setImageFullScreen] = useState<ImageI | undefined>();
   const [imageToExport, setImageToExport] = useState<ImageI | undefined>();
   const [imageToDL, setImageToDL] = useState<ImageI | undefined>();
+  const [downloadError, setDownloadError] = useState(''); // State for download-specific errors
 
   const { setAppContext } = useAppContext();
   const router = useRouter();
@@ -63,13 +63,35 @@ export default function TryOnResultDisplay({ isLoading, errorMsg, generatedImage
   };
 
   const handleDLimage = async (image: ImageI) => {
+    setDownloadError(''); // Reset previous errors
     try {
-      const res = await downloadMediaFromGcs(image.gcsUri);
+      // ======================= 【核心修改】: 获取用户和 Token =======================
+      const auth = getAuth();
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error("用户未登录，无法下载媒体文件。");
+      }
+      const idToken = await user.getIdToken(true);
+      // ========================================================================
+
+      // 【核心修改】: 传递 idToken
+      const res = await downloadMediaFromGcs(image.gcsUri, idToken);
+
+      if (typeof res === 'object' && res.error) {
+        throw new Error(res.error.replaceAll('Error: ', ''));
+      }
+      if (!res.data) {
+        throw new Error("下载成功，但未返回任何数据。");
+      }
+
       const name = `${image.key}.${image.format.toLowerCase()}`;
       downloadBase64Media(res.data, name, image.format);
-      if (typeof res === 'object' && res.error) throw Error(res.error.replaceAll('Error: ', ''));
+
     } catch (error: any) {
-      throw Error(error);
+      console.error("Download failed:", error);
+      setDownloadError(error.message || "下载过程中发生未知错误。");
+      // Optionally, show an alert to the user
+      alert(`下载失败: ${error.message || "未知错误"}`);
     }
   };
 

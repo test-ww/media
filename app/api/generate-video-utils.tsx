@@ -68,7 +68,7 @@ export const GenerateVideoFormFields = {
     label: '输出数量',
     type: 'chip-group',
     default: '1',
-    options: ['1', '2'],
+    options: ['1'],
     isDataResetable: false,
     isFullPromptAdditionalField: false,
   },
@@ -102,7 +102,7 @@ export const GenerateVideoFormFields = {
   durationSeconds: {
     label: '视频时长（秒）',
     type: 'chip-group',
-    default: '5',
+    default: '8',
     options: ['5', '6', '7', '8'],
     isDataResetable: true,
     isFullPromptAdditionalField: false,

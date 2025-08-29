@@ -1,0 +1,39 @@
+import { Suspense } from 'react';
+import { getSignedVideoAssets } from '@/app/api/gallery/action';
+import GalleryClient from './GalleryClient';
+import { Box, CircularProgress, Typography } from '@mui/material';
+
+export const metadata = {
+  title: '作品展览馆 - CloudPuppy',
+  description: '探索由社区创作的公开精选作品',
+};
+
+// 创建一个加载状态的 UI 组件
+const GalleryLoading = () => {
+  return (
+    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+      <CircularProgress />
+      <Typography sx={{ ml: 2 }}>正在加载精选作品...</Typography>
+    </Box>
+  );
+};
+
+// 主页面组件现在是异步的
+export default async function GalleryPage() {
+  // 在服务器端直接调用 Server Action 获取带签名的 URL
+  const videosWithSignedUrls = await getSignedVideoAssets();
+
+  return (
+    <div>
+      <Typography variant="h4" component="h1" sx={{ mb: 1, fontWeight: 'bold' }}>
+        作品展览馆
+      </Typography>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+        探索由社区创作的精选作品，悬停播放，点击查看详情。
+      </Typography>
+      <Suspense fallback={<GalleryLoading />}>
+        <GalleryClient videos={videosWithSignedUrls} />
+      </Suspense>
+    </div>
+  );
+}

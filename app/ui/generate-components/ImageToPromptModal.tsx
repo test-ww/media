@@ -1,7 +1,7 @@
-// 文件路径: app/ui/generate-components/ImageToPromptModal.tsx (最终完整版)
+"use client";
 
 import * as React from 'react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
  Box, Button, CircularProgress, Dialog, DialogContent, DialogTitle,
  IconButton, Slide, Stack, TextField, Typography,
@@ -11,6 +11,7 @@ import { Check, Close, Replay, Send } from '@mui/icons-material';
 import ImageDropzone from './ImageDropzone';
 import { getPromptFromImageFromGemini } from '@/app/api/gemini/action';
 import { CustomizedSendButton } from '../ux-components/Button-SX';
+import { getAuth } from 'firebase/auth'; // <-- 【核心修改】导入 getAuth
 
 const Transition = React.forwardRef(function Transition(
  props: TransitionProps & { children: React.ReactElement<any, any>; },
@@ -38,11 +39,31 @@ export default function ImageToPromptModal({
    setErrorMsg('请先上传一张图片。');
    return;
   }
+
+  // ======================= 【核心修改】: 获取用户和 Token =======================
+  const auth = getAuth();
+  const user = auth.currentUser;
+
+  if (!user) {
+    setErrorMsg("用户未登录，无法执行操作。请刷新页面或重新登录。");
+    return;
+  }
+  // ========================================================================
+
   setIsGeneratingPrompt(true);
   setErrorMsg('');
   setPrompt('');
   try {
-   const geminiReturnedPrompt = await getPromptFromImageFromGemini(image as string, target, userQuery);
+    // ======================= 【核心修改】: 获取并传递 Token =======================
+    const idToken = await user.getIdToken(true); // 获取用户的认证令牌 (true 表示强制刷新)
+    const geminiReturnedPrompt = await getPromptFromImageFromGemini(
+        image as string,
+        target,
+        userQuery,
+        idToken // 将令牌作为最后一个参数传递
+    );
+    // ========================================================================
+
    if (typeof geminiReturnedPrompt === 'object' && 'error' in geminiReturnedPrompt) {
     setErrorMsg(geminiReturnedPrompt.error);
    } else {
@@ -82,7 +103,6 @@ export default function ImageToPromptModal({
    TransitionComponent={Transition}
    PaperProps={{
     sx: {
-        // [核心] 移除硬编码的背景色，让其从主题继承
      display: 'flex',
      justifyContent: 'center',
      alignItems: 'left',
@@ -171,7 +191,7 @@ export default function ImageToPromptModal({
        sx={{ width: '98%' }}
        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); getPromptFromImage(); } }}
       />
-       
+
       <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="flex-end" sx={{ width: '100%' }}>
        <Button onClick={getPromptFromImage} variant="contained" disabled={!image || isGeneratingPrompt} endIcon={<Send />} sx={CustomizedSendButton}>
         {'生成'}

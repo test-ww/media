@@ -36,7 +36,7 @@ const virtualTryOnFormFields: {
   },
   personGeneration: {
     label: '人物生成',
-    default: 'allow_adult',
+    default: 'allow_all',
     options: [
       { value: 'allow_adult', label: '仅限成人' },
       { value: 'allow_all', label: '成人和儿童' },
@@ -45,7 +45,7 @@ const virtualTryOnFormFields: {
   },
   safetySetting: {
     label: '安全设置',
-    default: 'block_only_high',
+    default: 'block_none',
     options: [
       { value: 'block_low_and_above', label: '最强' },
       { value: 'block_medium_and_above', label: '中等' },
@@ -89,8 +89,8 @@ const formDataDefaults: VirtualTryOnFormI = {
   humanImage: { ...VtoImageDefaults, key: 'human' },
   garmentImages: [{ ...VtoImageDefaults, key: Math.random().toString(36).substring(2, 15) }],
   sampleCount: String(virtualTryOnFormFields.sampleCount.default ?? '1'),
-  personGeneration: virtualTryOnFormFields.personGeneration.default ?? 'allow_adult',
-  safetySetting: virtualTryOnFormFields.safetySetting.default ?? 'block_only_high',
+  personGeneration: virtualTryOnFormFields.personGeneration.default ?? 'allow_all',
+  safetySetting: virtualTryOnFormFields.safetySetting.default ?? 'block_none',
   seedNumber: virtualTryOnFormFields.seedNumber.default ?? '',
   outputFormat: virtualTryOnFormFields.outputFormat.default ?? 'image/png',
   modelVersion: virtualTryOnFormFields.modelVersion.default, // 使用更新后的默认值

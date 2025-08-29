@@ -22,6 +22,7 @@ import { downloadMediaFromGcs } from "../../api/cloud-storage/action";
 import UpscaleDialog from "./UpscaleDialog";
 import { useAuthFetch } from "../../lib/useAuthFetch";
 import { getFirebaseInstances } from "../../lib/firebase/client";
+import { getAuth } from "firebase/auth"; // <-- 【核心修改】导入 getAuth
 
 const { palette } = theme;
 const editModeField = EditImageFormFields.editMode;
@@ -81,7 +82,18 @@ export default function EditForm({
       }
       if (appContext && appContext.imageToEdit) {
         try {
-          const { data, error } = await downloadMediaFromGcs(appContext.imageToEdit);
+          // ======================= 【核心修改】: 获取用户和 Token =======================
+          const auth = getAuth();
+          const user = auth.currentUser;
+          if (!user) {
+            throw new Error("用户未登录，无法下载媒体文件。");
+          }
+          const idToken = await user.getIdToken(true);
+          // ========================================================================
+
+          // 【核心修改】: 传递 idToken
+          const { data, error } = await downloadMediaFromGcs(appContext.imageToEdit, idToken);
+
           if (error) throw new Error(error);
           if (data) {
             const newImage = `data:image/png;base64,${data}`;
@@ -169,6 +181,10 @@ export default function EditForm({
         const user = auth.currentUser;
         if (!user) throw new Error("用户未登录。");
 
+        // ======================= 【核心修改】: 获取 Token =======================
+        const idToken = await user.getIdToken(true);
+        // ========================================================================
+
         const res = await authFetch("/api/wrapped-actions/imagen", {
           method: "POST",
           body: JSON.stringify({
@@ -198,6 +214,7 @@ export default function EditForm({
           userID: appContext?.userID || "",
           modelVersion: formData["modelVersion"],
           mode: "Upscaled",
+          idToken: idToken, // <-- 【核心修改】传递 idToken
         });
 
         onImageGeneration(upscaledImage);

@@ -6,6 +6,7 @@ import { getFirebaseInstances } from "../lib/firebase/client";
 import { exportStandardFields, ExportMediaFormFieldsI } from "../api/export-utils";
 import { fetchJsonFromStorage } from "../api/cloud-storage/action";
 
+
 export interface appContextDataI {
   gcsURI?: string;
   userID?: string;
@@ -17,14 +18,12 @@ export interface appContextDataI {
   promptToGenerateImage?: string;
   promptToGenerateVideo?: string;
 }
-
 interface AppContextType {
   appContext: appContextDataI | null;
   setAppContext: React.Dispatch<React.SetStateAction<AppContextType["appContext"]>>;
   error: Error | string | null;
   setError: React.Dispatch<React.SetStateAction<Error | string | null>>;
 }
-
 export const appContextDataDefault: appContextDataI = {
   gcsURI: "",
   userID: "",
@@ -36,13 +35,13 @@ export const appContextDataDefault: appContextDataI = {
   promptToGenerateImage: "",
   promptToGenerateVideo: "",
 };
-
 const AppContext = createContext<AppContextType>({
   appContext: appContextDataDefault,
   setAppContext: () => {},
   error: null,
   setError: () => {},
 });
+
 
 export function ContextProvider({ children }: { children: React.ReactNode }) {
   const [appContext, setAppContext] = useState<AppContextType["appContext"]>(appContextDataDefault);
@@ -55,6 +54,11 @@ export function ContextProvider({ children }: { children: React.ReactNode }) {
         try {
           const gcsURI = `gs://${process.env.NEXT_PUBLIC_OUTPUT_BUCKET}`;
           const exportMetaOptionsURI = process.env.NEXT_PUBLIC_EXPORT_FIELDS_OPTIONS_URI!;
+          console.log(
+            "DEBUG: Constructed GCS output path for context:",
+            gcsURI
+          );
+
           const exportMetaOptions = await fetchJsonFromStorage(exportMetaOptionsURI);
 
           if (!exportMetaOptions) {
@@ -74,13 +78,21 @@ export function ContextProvider({ children }: { children: React.ReactNode }) {
           setError(null);
         } catch (configError: any) {
           console.error("Failed to fetch app configuration:", configError);
-          setError("Failed to load application configuration.");
-          setAppContext({ ...appContextDataDefault, isLoading: false, user: null });
+          setError("无法加载应用配置。部分功能可能不可用。");
+
+          setAppContext({
+            ...appContextDataDefault,
+            user: user,
+            userID: user.uid,
+            isLoading: false,
+            exportMetaOptions: undefined,
+          });
         }
       } else {
         setAppContext({
           ...appContextDataDefault,
           isLoading: false,
+          user: null,
         });
       }
     });
