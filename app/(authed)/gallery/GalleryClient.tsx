@@ -1,14 +1,16 @@
+
 'use client';
 
-import { useState, useRef } from 'react';
-import { useRouter } from 'next/navigation'; // 导入 useRouter Hook
+import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import type { SignedVideoAsset } from '@/app/api/gallery/action';
 import './gallery.css';
 
 export default function GalleryClient({ videos }: { videos: SignedVideoAsset[] }) {
   const [selectedVideo, setSelectedVideo] = useState<SignedVideoAsset | null>(null);
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
-  const router = useRouter(); // 获取 router 实例
+  const modalVideoRef = useRef<HTMLVideoElement>(null);
+  const router = useRouter();
 
   const handleMouseEnter = (id: string) => {
     const videoElement = videoRefs.current.get(id);
@@ -23,13 +25,17 @@ export default function GalleryClient({ videos }: { videos: SignedVideoAsset[] }
     }
   };
 
-  // 创建智能跳转的函数
   const handleCreateWithPrompt = (prompt: string) => {
-    // 对 prompt 进行 URL 编码，以防包含特殊字符
     const encodedPrompt = encodeURIComponent(prompt);
-    // 跳转到视频生成页面，并通过 URL query 参数传递 prompt
     router.push(`/studio/generate?mode=video&prompt=${encodedPrompt}`);
   };
+
+  // 3. 使用 useEffect 来确保模态框视频在显示时自动播放
+  useEffect(() => {
+    if (selectedVideo && modalVideoRef.current) {
+      modalVideoRef.current.play().catch(console.error);
+    }
+  }, [selectedVideo]);
 
   return (
     <>
@@ -55,13 +61,22 @@ export default function GalleryClient({ videos }: { videos: SignedVideoAsset[] }
       {selectedVideo && (
         <div className="modal-backdrop" onClick={() => setSelectedVideo(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-image-wrapper">
-              <img src={selectedVideo.signedThumbnailUrl} alt={selectedVideo.title} />
+            {/* 4. 将 <img> 替换为 <video> */}
+            <div className="modal-video-wrapper">
+              <video
+                ref={modalVideoRef}
+                src={selectedVideo.signedVideoUrl}
+                poster={selectedVideo.signedThumbnailUrl}
+                autoPlay // 自动播放
+                loop     // 循环播放
+                muted    // 自动播放通常需要静音
+                controls // 显示播放控件，给用户控制权
+                className="modal-video"
+              />
             </div>
             <div className="modal-details">
               <h2>{selectedVideo.title}</h2>
               <p><strong>Prompt:</strong> {selectedVideo.prompt}</p>
-              {/* 为按钮绑定新的点击事件 */}
               <button
                 className="modal-button"
                 onClick={() => handleCreateWithPrompt(selectedVideo.prompt)}
